@@ -1,0 +1,4 @@
+# Samples excluded from hand-landmark training/evaluation
+# Reason: no meaningful hand-sign gesture
+
+Yes_(Sign_2).mp4

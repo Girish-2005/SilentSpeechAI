@@ -20,9 +20,14 @@ env/
 ml/saved_models/*
 !ml/saved_models/.gitkeep
 
-# Dataset
+# Dataset files
 ml/dataset/*
-!ml/dataset/.gitkeep
+
+# Keep dataset metadata tracked
+!ml/dataset/excluded_samples.txt
+
+# MediaPipe task assets
+ml/models/assets/*.task
 
 # Logs
 *.log
