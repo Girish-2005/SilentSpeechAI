@@ -1,70 +1,121 @@
-# Development Log
+# SilentSpeech AI — Development Log
 
-## Milestone 1 — Dataset Validation
+## Milestone 2.1 — Hand Landmark Extraction
 
 ### Status
 Completed
 
-### Work Completed
+### Objective
+Extract hand landmarks from the ISL video dataset using MediaPipe HandLandmarker.
 
-- Initialized the SilentSpeech AI repository.
-- Established the project directory structure.
-- Verified the ISL sample dataset.
-- Analyzed video count, FPS, resolution, duration, and frame counts.
-- Extracted representative frames for visual inspection.
-- Migrated hand detection implementation to the MediaPipe Tasks API.
-- Validated hand detection across the complete video samples.
-- Identified an invalid dataset sample.
-- Added `Yes_(Sign_2).mp4` to the excluded sample list.
-- Re-ran hand detection analysis using only valid samples.
+### Dataset Validation
+The initial ISL dataset contained 12 videos across 6 sign classes:
 
-### Dataset Findings
+- Hello
+- Help
+- No
+- Please
+- Thank You
+- Yes
 
-Original dataset:
-- 12 videos
-- 6 classes
+One sample, `Yes_(Sign_2).mp4`, was manually identified as unsuitable because the subject does not perform the intended hand sign. The subject primarily moves without producing the target sign.
 
-After validation:
-- 11 valid videos
-- 6 classes
-- 1 excluded sample
+Therefore:
 
-Excluded sample:
+- Total videos: 12
+- Excluded videos: 1
+- Valid videos: 11
 
-`Yes_(Sign_2).mp4`
+### Hand Detection Results
 
-Reason:
+After excluding `Yes_(Sign_2).mp4`:
 
-The video does not contain a meaningful hand-sign gesture despite being labeled as `Yes`.
+- Overall hand detection rate: 50.99%
+- Highest detection rate: Please — 57.76%
+- Lowest detection rate: Help — 40.48%
 
-### Hand Detection Baseline
+The detection pipeline was validated using MediaPipe Tasks API / HandLandmarker.
 
-Overall frame-level detection rate on valid samples:
+### Landmark Representation
 
-**50.99%**
+For every detected hand:
 
-Best performing class:
+- 21 hand landmarks are extracted.
+- Each landmark contains X, Y and Z coordinates.
+- Total numerical landmark features per hand: 63.
+- Maximum supported hands per frame: 2.
 
-**Please — 57.76%**
+The generated CSV representation contains:
 
-Lowest performing class:
+- frame_index
+- timestamp_ms
+- hand_index
+- handedness
+- handedness_confidence
+- 21 × (X, Y, Z) landmark values
 
-**Help — 40.48%**
+Total CSV columns: 68.
 
-### Technical Decision
+### Validation Sample
 
-The project will use MediaPipe's Tasks API and support detection of up to two hands.
+`Help.csv` was successfully generated and validated:
 
-Individual frames without detected hands will not automatically cause the entire video to be discarded.
+- Video frames: 84
+- Frames containing hands: 34
+- Hand records: 53
+- Right-hand records: 33
+- Left-hand records: 20
+- Missing values: 0
+- CSV columns: 68
 
-The landmark extraction pipeline will handle missing observations before sequence generation.
+### Important Observation
 
-### Important Limitation
+Some frames containing two detected hands were classified by MediaPipe with the same handedness label, for example:
 
-The current dataset is too small for reliable production model training. It is currently being used to validate the processing and inference pipeline.
+- Frame 27 → [Right, Right]
+- Frame 33 → [Right, Right]
 
-### Next Milestone
+Therefore, the sequence-building stage must not blindly rely on the handedness label to assign physical left/right feature slots.
 
-Milestone 2:
+The raw handedness information will be preserved for analysis, while sequence construction will initially use detected hand index/slot information.
 
-**Hand Landmark Extraction and Sequence Generation**
+---
+
+## Milestone 2.2 — Sequence Construction
+
+### Status
+In Progress
+
+### Objective
+
+Convert per-hand landmark CSV data into frame-aligned temporal sequences suitable for the downstream ML pipeline.
+
+### Design
+
+The sequence builder must reconstruct every original video frame, including frames where no hand was detected.
+
+For each frame:
+
+- Up to 2 hands are represented.
+- Each hand contains 21 × 3 = 63 landmark values.
+- Maximum landmark representation per frame = 126 values.
+- Missing hands are represented using a detection mask.
+
+Expected representation:
+
+- Landmark tensor: `(number_of_frames, 126)`
+- Detection mask: `(number_of_frames, 2)`
+
+### Normalization
+
+Landmarks will initially be normalized relative to the wrist landmark (landmark 0):
+
+`normalized_landmark = landmark - wrist`
+
+This reduces dependency on the absolute position of the hand within the camera frame.
+
+### Design Principle
+
+The sequence builder must preserve temporal ordering and missing-frame information rather than compressing the CSV rows directly into a sequence.
+
+This representation will later be evaluated before fixed-length temporal resampling and model training are introduced.
